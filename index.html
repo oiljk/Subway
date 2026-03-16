@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>지하철 시간 알리미</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08090d;
+  --surface: #0f1117;
+  --surface2: #161b26;
+  --border: #1e2535;
+  --border2: #252f42;
+  --text: #e8ecf4;
+  --text2: #8894a8;
+  --text3: #4a556a;
+  --line4: #00aaee;
+  --line7: #657800;
+  --line7b: #8aaa00;
+  --accent: #4f8ef7;
+  --accent-glow: rgba(79,142,247,0.18);
+  --green: #2fcf6e;
+  --amber: #f5a623;
+  --red: #f45c5c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 48px;
+}
+
+/* subtle dot grid bg */
+body::before {
+  content:'';
+  position: fixed; inset:0;
+  background-image: radial-gradient(circle, rgba(79,142,247,0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events:none;
+  z-index:0;
+}
+
+.wrap {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 28px 16px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── TOP CLOCK ── */
+.clock-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 22px 24px 18px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.clock-block::after {
+  content:'';
+  position:absolute; top:-40px; right:-40px;
+  width:160px; height:160px;
+  background: radial-gradient(circle, rgba(79,142,247,0.1) 0%, transparent 65%);
+  pointer-events:none;
+}
+
+.clock-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+
+.clock-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.clock-date {
+  font-size: 13px;
+  color: var(--text2);
+  margin-top: 8px;
+}
+
+/* ── ROUTE PILL ── */
+.route-pill {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  gap: 8px;
+}
+
+.st {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 70px;
+}
+
+.st-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 5px;
+  padding: 2px 6px;
+  letter-spacing: 0.05em;
+}
+
+.b4 { background: var(--line4); color: #fff; }
+.b7 { background: var(--line7); color: #fff; }
+.btrans { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+
+.st-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.arrow-seg {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.seg-line {
+  height: 2px;
+  width: 100%;
+  border-radius: 2px;
+}
+
+.seg4 { background: linear-gradient(90deg, var(--line4), rgba(0,170,238,0.3)); }
+.seg7 { background: linear-gradient(90deg, rgba(138,170,0,0.3), var(--line7b)); }
+
+.seg-min {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── SCHEDULE STRIP ── */
+.schedule-header {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.sched-strip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+
+.sched-row {
+  display: flex;
+  align-items: center;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.2s;
+}
+
+.sched-row:last-child { border-bottom: none; }
+
+.sched-row.is-today {
+  background: rgba(79,142,247,0.07);
+}
+
+.sched-row.is-past {
+  opacity: 0.35;
+}
+
+.day-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  margin-right: 12px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+
+.sched-row.is-today .day-dot {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(79,142,247,0.4);
+}
+
+.sched-class-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.sched-row.is-today .sched-class-time { color: var(--accent); }
+
+.sched-countdown {
+  font-size: 11px;
+  color: var(--text2);
+  text-align: right;
+}
+
+.sched-row.is-today .sched-countdown {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── TRAIN CARDS ── */
+.trains-header {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+
+.train-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.4s ease both;
+}
+
+.train-card:nth-child(2) { animation-delay: 0.1s; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.train-card.t-first {
+  border-color: rgba(79,142,247,0.35);
+  background: linear-gradient(140deg, #0f1822, #0a1020);
+}
+
+.train-card.t-first::before {
+  content:'가장 빠른 열차';
+  position: absolute; top:-1px; left: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px; font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 0 0 8px 8px;
+}
+
+.train-card.t-second::before {
+  content:'다음 열차';
+  position: absolute; top:-1px; left: 16px;
+  background: var(--surface2);
+  color: var(--text3);
+  font-size: 9px; font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 0 0 8px 8px;
+  border: 1px solid var(--border2);
+  border-top: none;
+}
+
+.train-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 14px;
+}
+
+.train-depart {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -1px;
+}
+
+.train-card.t-first .train-depart { color: var(--accent); }
+
+.train-arrive-tag {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.train-diff {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: auto;
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+.diff-soon { background: rgba(244,92,92,0.15); color: var(--red); }
+.diff-near { background: rgba(245,166,35,0.15); color: var(--amber); }
+.diff-ok   { background: rgba(47,207,110,0.12); color: var(--green); }
+
+/* journey steps */
+.steps { display: flex; flex-direction: column; }
+
+.step-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.step-vis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 16px;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.vline {
+  width: 2px;
+  flex: 1;
+  min-height: 16px;
+  margin: 3px 0;
+  border-radius: 2px;
+}
+
+.step-info {
+  padding-bottom: 12px;
+  flex: 1;
+}
+
+.step-row:last-child .step-info { padding-bottom: 0; }
+
+.step-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-time-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.step-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+/* no schedule */
+.empty-state {
+  text-align: center;
+  padding: 32px 20px;
+  color: var(--text3);
+  font-size: 13px;
+  line-height: 2;
+}
+
+.empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+/* refresh */
+.refresh-btn {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 13px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  color: var(--text3);
+  font-size: 12px;
+  font-family: 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.04em;
+}
+
+.refresh-btn:hover {
+  background: var(--surface);
+  color: var(--text2);
+  border-color: rgba(79,142,247,0.3);
+}
+
+.ri { display:inline-block; transition: transform 0.5s; }
+.refresh-btn:hover .ri { transform: rotate(180deg); }
+
+.note {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 20px;
+  line-height: 1.9;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Clock -->
+  <div class="clock-block">
+    <div class="clock-label">현재 시각 (KST)</div>
+    <div class="clock-time" id="clkTime">--:--:--</div>
+    <div class="clock-date" id="clkDate">--</div>
+  </div>
+
+  <!-- Route -->
+  <div class="route-pill">
+    <div class="st">
+      <span class="st-badge b4">4호선</span>
+      <span class="st-name">반월역</span>
+    </div>
+    <div class="arrow-seg">
+      <div class="seg-line seg4"></div>
+      <div class="seg-min">약 38분</div>
+    </div>
+    <div class="st">
+      <span class="st-badge btrans">환승</span>
+      <span class="st-name">이수역</span>
+    </div>
+    <div class="arrow-seg">
+      <div class="seg-line seg7"></div>
+      <div class="seg-min">약 17분</div>
+    </div>
+    <div class="st">
+      <span class="st-badge b7">7호선</span>
+      <span class="st-name">어린이대공원</span>
+    </div>
+  </div>
+
+  <!-- Schedule strip -->
+  <div class="schedule-header">수업 스케줄</div>
+  <div class="sched-strip" id="schedStrip"></div>
+
+  <!-- Train cards -->
+  <div class="trains-header">🚇 오늘의 추천 열차</div>
+  <div id="trainArea"></div>
+
+  <button class="refresh-btn" onclick="renderAll()">
+    <span class="ri">↻</span> 새로고침
+  </button>
+
+  <div class="note">
+    반월역 출발 기준 · 이수역(총신대입구) 환승 · 어린이대공원역 도착<br>
+    총 소요 약 55~60분 · 수업 시작 30~40분 전 출발 권장
+  </div>
+</div>
+
+<script>
+// ================================================================
+// 수업 스케줄  (day: 0=일 1=월 2=화 3=수 4=목 5=금 6=토)
+// ================================================================
+// 수업 시작 시각 (알림 시각 + 2시간)
+// 월 8:30→10:30 / 화·목 13:00→15:00 / 수 7:00→9:00 / 금 10:00→12:00
+const CLASS_SCHED = [
+  { day:1, h:10, m:30, label:'월', alertH:8,  alertM:30 },
+  { day:2, h:15, m:0,  label:'화', alertH:13, alertM:0  },
+  { day:3, h:9,  m:0,  label:'수', alertH:7,  alertM:0  },
+  { day:4, h:15, m:0,  label:'목', alertH:13, alertM:0  },
+  { day:5, h:12, m:0,  label:'금', alertH:10, alertM:0  },
+];
+
+// ================================================================
+// 반월역(4호선) 평일 출발 시간표 → 이수(총신대입구)역 도착 환산
+// 반월→이수 소요시간: 약 38분
+// 이수→어린이대공원 소요시간: 약 17분 (7호선 환승 포함 대기 ~5분)
+// ================================================================
+// 반월역 4호선 상행(당고개 방면) 평일 주요 시간대 출발 시각
+const BANWOL_DEPARTS = [
+  // 새벽
+  [5,31],[5,43],[5,55],
+  // 6시대
+  [6,3],[6,11],[6,19],[6,27],[6,35],[6,43],[6,51],[6,59],
+  // 7시대
+  [7,7],[7,15],[7,23],[7,31],[7,39],[7,47],[7,55],
+  // 8시대
+  [8,3],[8,11],[8,19],[8,27],[8,35],[8,43],[8,51],[8,59],
+  // 9시대
+  [9,7],[9,15],[9,23],[9,31],[9,39],[9,47],[9,55],
+  // 10시대
+  [10,7],[10,15],[10,23],[10,31],[10,39],[10,47],[10,55],
+  // 11시대
+  [11,7],[11,15],[11,23],[11,31],[11,39],[11,47],[11,55],
+  // 12시대
+  [12,7],[12,15],[12,23],[12,31],[12,39],[12,47],[12,55],
+  // 13시대
+  [13,3],[13,11],[13,19],[13,27],[13,35],[13,43],[13,51],[13,59],
+  // 14~16시
+  [14,7],[14,15],[14,23],[14,31],[14,39],[14,47],[14,55],
+  [15,7],[15,15],[15,23],[15,31],[15,39],[15,47],[15,55],
+  [16,3],[16,11],[16,19],[16,27],[16,35],[16,43],[16,51],[16,59],
+  // 17시대 (러시)
+  [17,7],[17,15],[17,23],[17,31],[17,39],[17,47],[17,55],
+  // 18시대
+  [18,3],[18,11],[18,19],[18,27],[18,35],[18,43],[18,51],[18,59],
+  // 19시대
+  [19,7],[19,15],[19,23],[19,31],[19,39],[19,47],[19,55],
+  // 20시대
+  [20,7],[20,15],[20,23],[20,31],[20,47],
+  // 21시대
+  [21,3],[21,19],[21,35],[21,51],
+  // 22시대
+  [22,7],[22,23],[22,39],[22,55],
+  // 23시대
+  [23,11],[23,27],[23,43],[23,55],
+];
+
+// 반월 출발 → 어린이대공원 도착 계산
+// 이수 도착 = 반월출발 + 38분
+// 이수 출발(7호선) ≈ 이수도착 + 5분 (환승 대기)
+// 어린이대공원 도착 = 이수출발 + 17분
+function toMins(h, m){ return h*60 + m; }
+function fromMins(total){ return [Math.floor(total/60)%24, total%60]; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmt(h,m){ return pad2(h)+':'+pad2(m); }
+
+const TRAINS = BANWOL_DEPARTS.map(([h,m]) => {
+  const dep = toMins(h,m);
+  const isuArr = dep + 38;
+  const isuDep = isuArr + 5;
+  const parkArr = isuDep + 17;
+  const [ia_h, ia_m] = fromMins(isuArr);
+  const [id_h, id_m] = fromMins(isuDep);
+  const [pa_h, pa_m] = fromMins(parkArr);
+  return {
+    banwol:  { h, m },
+    isuArr:  { h: ia_h, m: ia_m },
+    isuDep:  { h: id_h, m: id_m },
+    parkArr: { h: pa_h, m: pa_m },
+    depMins: dep,
+    arrMins: parkArr,
+  };
+});
+
+// ================================================================
+// 주어진 수업 시각(classHour,classMin)에 맞는 열차 2개 반환
+// 조건: 반월 출발 < 수업시각 - 30분, 도착 < 수업시각
+// ================================================================
+function getTrains(classH, classM) {
+  const deadline = toMins(classH, classM); // 수업 시작
+  const latestDepart = deadline - 55; // 최소 55분 전 출발해야 도착 가능
+  // 수업 35~65분 전 사이에 출발하는 열차
+  const candidates = TRAINS.filter(t => {
+    return t.arrMins <= deadline - 5 && t.depMins >= deadline - 90;
+  });
+  // 가장 늦게 출발(도착 여유 최소)하는 것부터 2개
+  candidates.sort((a,b) => b.depMins - a.depMins);
+  return candidates.slice(0,2);
+}
+
+// ================================================================
+// 현재 시각으로 보여줄 수업 결정
+// ================================================================
+function getNow() {
+  const now = new Date();
+  // Intl API로 Asia/Seoul 기준 정확한 KST 추출
+  const g = (unit) => parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul', [unit]: 'numeric', hour12: false
+  }).format(now));
+  const h = g('hour') % 24;
+  const m = g('minute');
+  const s = g('second');
+  const dayStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul', weekday: 'short'
+  }).format(now);
+  const dayMap = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  const day = dayMap[dayStr];
+  const dateStr = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year:'numeric', month:'long', day:'numeric', weekday:'long'
+  }).format(now);
+  return { day, h, m, s, totalMins: h*60+m, dateStr, timeStr: pad2(h)+':'+pad2(m)+':'+pad2(s) };
+}
+
+// 해당 요일의 수업
+function todayClass(day) {
+  return CLASS_SCHED.find(c => c.day === day) || null;
+}
+
+// 다음 수업 (오늘 포함)
+function nextClass(day, totalMins) {
+  // 오늘 수업이 아직 안 지났으면
+  const tc = todayClass(day);
+  if (tc && toMins(tc.h, tc.m) > totalMins) return { ...tc, daysAhead:0 };
+  // 다음 요일 탐색
+  for (let d=1; d<=7; d++) {
+    const nd = (day+d)%7;
+    const nc = CLASS_SCHED.find(c => c.day === nd);
+    if (nc) return { ...nc, daysAhead:d };
+  }
+  return null;
+}
+
+// 남은 시간 텍스트
+function remainText(targetH, targetM, daysAhead, curMins) {
+  let diff = toMins(targetH, targetM) - curMins + daysAhead*1440;
+  if (diff < 0) return '지남';
+  const hh = Math.floor(diff/60), mm = diff%60;
+  if (daysAhead > 0) return `${daysAhead}일 후`;
+  if (hh > 0) return `${hh}시간 ${mm}분 후`;
+  return `${mm}분 후`;
+}
+
+// 열차 출발까지 남은 시간
+function trainDiff(trainH, trainM, curMins) {
+  const diff = toMins(trainH, trainM) - curMins;
+  if (diff < 0) return { text:'출발함', cls:'diff-soon' };
+  if (diff <= 5) return { text:`${diff}분 후`, cls:'diff-soon' };
+  if (diff <= 15) return { text:`${diff}분 후`, cls:'diff-near' };
+  return { text:`${diff}분 후`, cls:'diff-ok' };
+}
+
+const DAY_KO = ['일','월','화','수','목','금','토'];
+
+// ================================================================
+// RENDER
+// ================================================================
+function renderAll() {
+  const now = getNow();
+
+  // Clock
+  document.getElementById('clkTime').textContent = now.timeStr;
+  document.getElementById('clkDate').textContent = now.dateStr;
+
+  // Schedule strip
+  const strip = document.getElementById('schedStrip');
+  strip.innerHTML = CLASS_SCHED.map(c => {
+    const isToday = c.day === now.day;
+    const classMin = toMins(c.h, c.m);
+    const isPast = isToday && classMin <= now.totalMins;
+    let cls = '';
+    if (isToday) cls = 'is-today';
+    else if (isPast) cls = 'is-past';
+
+    const remain = isToday
+      ? (isPast ? '수업 시작됨' : remainText(c.h, c.m, 0, now.totalMins))
+      : '';
+
+    return `
+    <div class="sched-row ${cls}">
+      <div class="day-dot">${DAY_KO[c.day]}</div>
+      <div style="flex:1">
+        <div class="sched-class-time">${fmt(c.alertH,c.alertM)} <span style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">출발</span></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">수업 ${fmt(c.h,c.m)}</div>
+      </div>
+      <div class="sched-countdown">${remain}</div>
+    </div>`;
+  }).join('');
+
+  // Train area
+  const area = document.getElementById('trainArea');
+
+  // 오늘 수업
+  const tc = todayClass(now.day);
+  const nc = nextClass(now.day, now.totalMins);
+
+  if (!tc) {
+    // 오늘 수업 없음 → 다음 수업 안내
+    if (nc) {
+      const trains = getTrains(nc.h, nc.m);
+      area.innerHTML = `
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;padding-left:2px;">
+          오늘은 수업이 없습니다 · 다음 수업: <b style="color:var(--text2)">${DAY_KO[nc.day]}요일 ${fmt(nc.h,nc.m)}</b>
+        </div>
+        ${renderTrainCards(trains, nc, now, true)}`;
+    } else {
+      area.innerHTML = `<div class="empty-state"><div class="empty-icon">🛤️</div>오늘은 수업이 없습니다.</div>`;
+    }
+    return;
+  }
+
+  const classMins = toMins(tc.h, tc.m);
+  if (classMins <= now.totalMins) {
+    // 수업 이미 시작됨
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div>오늘 수업(${fmt(tc.h,tc.m)})은 이미 시작되었습니다.<br>수고하셨어요!</div>`;
+    return;
+  }
+
+  // 수업 시작 전 → 열차 표시
+  const trains = getTrains(tc.h, tc.m);
+  if (trains.length === 0) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div>적합한 열차를 찾을 수 없습니다.<br>수업 시간까지 ${remainText(tc.h,tc.m,0,now.totalMins)}</div>`;
+    return;
+  }
+
+  area.innerHTML = renderTrainCards(trains, tc, now, false);
+}
+
+function renderTrainCards(trains, cls, now, isNext) {
+  if (trains.length === 0) return `<div class="empty-state">해당 시간대 열차 정보 없음</div>`;
+
+  return trains.map((t, i) => {
+    const diff = trainDiff(t.banwol.h, t.banwol.m, now.totalMins);
+    const cardCls = i === 0 ? 't-first' : 't-second';
+    const buffer = toMins(cls.h, cls.m) - t.arrMins;
+
+    return `
+    <div class="train-card ${cardCls}">
+      <div class="train-top">
+        <div class="train-depart">${fmt(t.banwol.h,t.banwol.m)}</div>
+        <div class="train-arrive-tag">반월 출발 → ${fmt(t.parkArr.h,t.parkArr.m)} 도착</div>
+        <div class="train-diff ${diff.cls}">${diff.text}</div>
+      </div>
+      <div class="steps">
+        <div class="step-row">
+          <div class="step-vis">
+            <div class="dot" style="border-color:var(--line4);"></div>
+            <div class="vline" style="background:var(--line4);opacity:0.5;"></div>
+          </div>
+          <div class="step-info">
+            <div class="step-name">
+              반월역
+              <span class="step-time-badge">${fmt(t.banwol.h,t.banwol.m)} 출발</span>
+            </div>
+            <div class="step-sub">4호선 당고개 방면 · 약 38분 승차</div>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-vis">
+            <div class="dot" style="border-color:#f59e0b;"></div>
+            <div class="vline" style="background:var(--line7b);opacity:0.5;"></div>
+          </div>
+          <div class="step-info">
+            <div class="step-name">
+              이수역(총신대입구) 환승
+              <span class="step-time-badge">${fmt(t.isuArr.h,t.isuArr.m)} 도착 / ${fmt(t.isuDep.h,t.isuDep.m)} 출발</span>
+            </div>
+            <div class="step-sub">7호선 장암 방면 환승 · 약 5분 대기 · 17분 승차</div>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-vis">
+            <div class="dot" style="border-color:var(--line7b);"></div>
+          </div>
+          <div class="step-info">
+            <div class="step-name">
+              어린이대공원역 도착
+              <span class="step-time-badge">${fmt(t.parkArr.h,t.parkArr.m)}</span>
+            </div>
+            <div class="step-sub">수업(${fmt(cls.h,cls.m)})까지 여유 <b style="color:var(--green)">${buffer}분</b></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Clock 1초마다 업데이트
+setInterval(() => {
+  const now = getNow();
+  const el = document.getElementById('clkTime');
+  if (el) el.textContent = now.timeStr;
+}, 1000);
+
+// 전체 1분마다 갱신
+setInterval(renderAll, 60000);
+
+// 초기 렌더
+renderAll();
+</script>
+</body>
+</html>
